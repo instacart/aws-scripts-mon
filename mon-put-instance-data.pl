@@ -31,6 +31,9 @@ Description of available options:
   --disk-space-util   Reports disk space utilization in percentages.
   --disk-space-used   Reports allocated disk space in gigabytes.
   --disk-space-avail  Reports available disk space in gigabytes.
+  --disk-inode-util   Reports disk inode utilization in percentages.
+  --disk-inode-used   Reports allocated disk inode.
+  --disk-inode-avail  Reports available disk inode.
 
   --aggregated[=only]    Adds aggregated metrics for instance type, AMI id, and region.
                          If =only is specified, does not report individual instance metrics
@@ -115,6 +118,9 @@ my $report_swap_used;
 my $report_disk_util;
 my $report_disk_used;
 my $report_disk_avail;
+my $report_inode_util;
+my $report_inode_used;
+my $report_inode_avail;
 my $mem_used_incl_cache_buff;
 my @mount_path;
 my $mem_units;
@@ -153,6 +159,9 @@ my $argv_size = @ARGV;
     'disk-space-util' => \$report_disk_util,
     'disk-space-used' => \$report_disk_used,
     'disk-space-avail' => \$report_disk_avail,
+    'disk-inode-util' => \$report_inode_util,
+    'disk-inode-used' => \$report_inode_used,
+    'disk-inode-avail' => \$report_inode_avail,
     'auto-scaling:s' => \$auto_scaling,
     'aggregated:s' => \$aggregated,
     'memory-units:s' => \$mem_units,
@@ -320,11 +329,11 @@ foreach my $path (@mount_path) {
   }
 }
 
-if ($report_disk_space && !$report_disk_util && !$report_disk_used && !$report_disk_avail) {
-  exit_with_error("Disk path is provided but metrics to report disk space are not specified.");
+if ($report_disk_space && !$report_disk_util && !$report_disk_used && !$report_disk_avail && !$report_inode_util && !$report_inode_used && !$report_inode_avail) {
+  exit_with_error("Disk path is provided but metrics to report disk space/inode are not specified.");
 }
-if (!$report_disk_space && ($report_disk_util || $report_disk_used || $report_disk_avail)) {
-  exit_with_error("Metrics to report disk space are provided but disk path is not specified.");
+if (!$report_disk_space && ($report_disk_util || $report_disk_used || $report_disk_avail || $report_inode_util || $report_inode_used || $report_inode_avail)) {
+  exit_with_error("Metrics to report disk space/inode are provided but disk path is not specified.");
 }
 
 # check that there is a need to monitor at least something
@@ -544,7 +553,7 @@ if ($report_mem_util || $report_mem_used || $report_mem_avail || $report_swap_ut
 
 # collect disk space metrics
 
-if ($report_disk_space)
+if ($report_disk_space && ($report_disk_util || $report_disk_used || $report_disk_avail))
 {
   my @df = `/bin/df -k -l -P $df_path`;
   shift @df;
@@ -569,6 +578,35 @@ if ($report_disk_space)
     }
     if ($report_disk_avail) {
       add_metric('DiskSpaceAvailable', $disk_units, $disk_avail / $disk_unit_div, $fsystem, $mount);
+    }
+  }
+}
+
+if ($report_disk_space && ($report_inode_util || $report_inode_used || $report_inode_avail))
+{
+  my @df = `/bin/df -k -l -P -i $df_path`;
+  shift @df;
+
+  foreach my $line (@df)
+  {
+    my @fields = split('\s+', $line);
+    # Result of df is reported in 1k blocks
+    my $inode_total = $fields[1];
+    my $inode_used = $fields[2];
+    my $inode_avail = $fields[3];
+    my $fsystem = $fields[0];
+    my $mount = $fields[5];
+
+    if ($report_inode_util) {
+      my $inode_util = 0;
+      $inode_util = 100 * $inode_used / $inode_total if ($inode_total > 0);
+      add_metric('DiskInodeUtilization', 'Percent', $inode_util, $fsystem, $mount);
+    }
+    if ($report_inode_used) {
+      add_metric('DiskInodeUsed', 'Inode', $inode_used, $fsystem, $mount);
+    }
+    if ($report_inode_avail) {
+      add_metric('DiskInodeAvailable', 'Inode', $inode_avail, $fsystem, $mount);
     }
   }
 }
