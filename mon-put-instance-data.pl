@@ -40,7 +40,7 @@ Description of available options:
   --auto-scaling[=only]  Reports Auto Scaling metrics in addition to instance metrics.
                          If =only is specified, does not report individual instance metrics
 
-  --mem-used-incl-cache-buff  Count memory that is cached and in buffers as used.
+  --mem-used-incl-cache-buff  Count filsystem cache, buffers, and reclaimable slab memory as used.
   --memory-units=UNITS        Specifies units for memory metrics.
   --disk-space-units=UNITS    Specifies units for disk space metrics.
 
@@ -520,9 +520,10 @@ if ($report_mem_util || $report_mem_used || $report_mem_avail || $report_swap_ut
   my $mem_free = $meminfo{'MemFree'} * KILO;
   my $mem_cached = $meminfo{'Cached'} * KILO;
   my $mem_buffers = $meminfo{'Buffers'} * KILO;
+  my $mem_slab_reclaimable = $meminfo{'SReclaimable'} * KILO;
   my $mem_avail = $mem_free;
   if (!defined($mem_used_incl_cache_buff)) {
-     $mem_avail += $mem_cached + $mem_buffers;
+     $mem_avail += $mem_cached + $mem_buffers + $mem_slab_reclaimable;
   }
   my $mem_used = $mem_total - $mem_avail;
   my $swap_total = $meminfo{'SwapTotal'} * KILO;
